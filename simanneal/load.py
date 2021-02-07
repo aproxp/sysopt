@@ -17,7 +17,7 @@ import pandas as pd
 random.seed(10)
 
 # Get tasks, processors and cores
-tree = ET.parse('small.xml')
+tree = ET.parse('medium.xml')
 root = tree.getroot()
 tasks = root.findall("./Application/Task")
 mcps = root.findall("./Platform/MCP")
@@ -126,17 +126,82 @@ for n in attribute_names:
 df.columns = attribute_names
 df = df.astype(dt)
 
-uniq_cores = pd.unique(df['core_uniq'].values)
-for ucore in uniq_cores:
-    task_core_asgn = df.loc[(df['core_uniq']==ucore)]
-    df.loc[task_core_asgn.index, 'wcrt'] = get_wcrts(task_core_asgn).values
-            
 
-# def annealing(init: pd.DataFrame):
-#     T_start = 1.0
-#     alpha = 0.0
-#     stop = 0
+def calc_wcrt(df: pd.DataFrame):
+    uniq_cores = pd.unique(df['core_uniq'].values)
+    for ucore in uniq_cores:
+        task_core_asgn = df.loc[(df['core_uniq']==ucore)]
+        df.loc[task_core_asgn.index, 'wcrt'] = get_wcrts(task_core_asgn).values
+
+def calc_wcet(df: pd.DataFrame):
+    df['wcet'] = np.ceil(df['wcet'] * df['wcet_fact']).astype(int)
+
+def rand_move(df: pd.DataFrame, mcps):
+    sample = df.sample()
+    mcp = random.choice(mcps)
+    mid = int(mcp.get('Id'))
+    core = random.choice(mcp.findall('Core'))
+    cid = int(core.get('Id'))
+    while sample.iloc[0]['mcp_id'] == mid and sample.iloc[0]['core_id'] == cid:
+        mcp = random.choice(mcps)
+        mid = int(mcp.get('Id'))
+        core = random.choice(mcp.findall('Core'))
+        cid = int(core.get('Id'))
+    core_uniq = f"{mid}:{cid}"
     
-#     while T < stop:
-        
+    C_fact = float(core.get('WCETFactor'))
+    
+    sln = df.copy()
+    sln.loc[sample.index, 'core_uniq'] = core_uniq
+    sln.loc[sample.index, 'mcp_id'] = mid
+    sln.loc[sample.index, 'core_id'] = cid
+    sln.loc[sample.index, 'wcet_fact'] = C_fact
+    sln.loc[sample.index, 'wcet'] = C_fact * sln.loc[sample.index, 'task_wcet']
+    
+    return sln
 
+solution = rand_solve(tasks, mcps)
+df = pd.DataFrame(solution)
+dt = {}
+attribute_names = ['core_uniq', 'task_id', 'task_deadline', 'task_period', 'task_wcet']
+attribute_names += ['mcp_id', 'core_id', 'wcet_fact', 'wcet']
+for n in attribute_names:
+    if n == 'core_uniq':
+        dt[n] = 'string'
+    elif n == 'wcet_fact':
+        dt[n] = 'float64'
+    else:
+        dt[n] = 'int32'
+        
+df.columns = attribute_names
+df = df.astype(dt)
+calc_wcrt(df)
+        
+def calc_beta(cur_cost, cand_cost, T):
+    rand = random.random()
+    if T < 0.4:
+        if rand > 0.2:
+            return False
+        return True
+    else:
+        if rand > 0.4:
+            return False
+        return True
+
+def annealing(init: pd.DataFrame, mcps):
+    T = 1.0
+    T_accept = 0.000001
+    alpha = 0.99
+    df = init.copy()
+    while T > T_accept:
+        cand = rand_move(df, mcps)
+        calc_wcrt(cand)
+        beta = calc_beta(cost(df), cost(cand), T)
+        if cost(cand) < cost(df):
+            df = cand
+        else:
+            if beta:
+                df = cand
+        T = T*alpha
+    return df
+        
