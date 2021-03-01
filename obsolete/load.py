@@ -5,7 +5,7 @@ Created on Sun Jan 24 15:51:06 2021
 @author: Aleksander
 """
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as et
 # To try some official implementation
 from scipy.optimize import dual_annealing
 import random
@@ -17,24 +17,20 @@ import pandas as pd
 random.seed(10)
 
 # Get tasks, processors and cores
-tree = ET.parse('medium.xml')
+tree = et.parse('../data/small.xml')
 root = tree.getroot()
 tasks = root.findall("./Application/Task")
 mcps = root.findall("./Platform/MCP")
 cores = root.findall("./Platform/MCP/Core")
 
 # Sort by priority. Shortest deadline firts, WCET second
-tasks.sort(key = lambda task: int(task.get('WCET')))
-tasks.sort(key = lambda task: int(task.get('Deadline')))
+tasks.sort(key=lambda task: int(task.get('WCET')))
+tasks.sort(key=lambda task: int(task.get('Deadline')))
 
-# for task in tasks:
-#     print(task.get('Id'), task.get('Period'), task.get('WCET'))
-# for mcp in mcps:
-#     print(mcp.tag, mcp.attrib)
-#     print(list(mcp))
 
 def avg_laxity(tasks: pd.DataFrame):
     return np.mean(tasks.task_deadline - tasks.wcrt)
+
 
 # Are the task schedulable?
 def dm_guarantee(tasks: pd.DataFrame):
@@ -48,10 +44,11 @@ def dm_guarantee(tasks: pd.DataFrame):
                 return False
             C_js = [float(wcet) for wcet in tasks[0:i]['wcet']]
             T_js = [float(period) for period in tasks[0:i]['task_period']]
-            I = sum(ceil(D_i/T_j)*C_j for T_j, C_j in zip(T_js, C_js))
+            I = sum(ceil(D_i / T_j) * C_j for T_j, C_j in zip(T_js, C_js))
             if I + C_i <= R:
                 break
     return True
+
 
 # What is the worst case response time
 def get_wcrts(tasks: pd.DataFrame):
@@ -65,11 +62,12 @@ def get_wcrts(tasks: pd.DataFrame):
             D_i = float(task['task_deadline'])
             C_js = [float(wcet) for wcet in tasks[0:i]['wcet']]
             T_js = [float(period) for period in tasks[0:i]['task_period']]
-            I = sum(ceil(D_i/T_j)*C_j for T_j, C_j in zip(T_js, C_js))
+            I = sum(ceil(D_i / T_j) * C_j for T_j, C_j in zip(T_js, C_js))
             if I + C_i <= R:
                 break
         wcrts[i] = int(R)
     return wcrts
+
 
 # Get initial solution LEGACY - USES ElementTree objects
 def rand_solve(tasks, mcps):
@@ -95,10 +93,11 @@ def rand_solve(tasks, mcps):
 def dm_g(df: pd.DataFrame):
     uniq_cores = pd.unique(df['core_uniq'].values)
     for ucore in uniq_cores:
-        task_core_asgn = df.loc[(df['core_uniq']==ucore)]
-        if not(dm_guarantee(task_core_asgn)):
+        task_core_asgn = df.loc[(df['core_uniq'] == ucore)]
+        if not (dm_guarantee(task_core_asgn)):
             return False
     return True
+
 
 # cost for annealing. If the schedule is not feasible, it simply returns 1
 # if it is, the inverse of average laxity 
@@ -106,10 +105,10 @@ def cost(df: pd.DataFrame):
     lax = 0
     if dm_g(df):
         lax = 1
-    lax += avg_laxity(df)**-1
+    lax += avg_laxity(df) ** -1
     return lax
-    
-    
+
+
 solution = rand_solve(tasks, mcps)
 df = pd.DataFrame(solution)
 dt = {}
@@ -122,7 +121,7 @@ for n in attribute_names:
         dt[n] = 'float64'
     else:
         dt[n] = 'int32'
-        
+
 df.columns = attribute_names
 df = df.astype(dt)
 
@@ -130,11 +129,13 @@ df = df.astype(dt)
 def calc_wcrt(df: pd.DataFrame):
     uniq_cores = pd.unique(df['core_uniq'].values)
     for ucore in uniq_cores:
-        task_core_asgn = df.loc[(df['core_uniq']==ucore)]
+        task_core_asgn = df.loc[(df['core_uniq'] == ucore)]
         df.loc[task_core_asgn.index, 'wcrt'] = get_wcrts(task_core_asgn).values
+
 
 def calc_wcet(df: pd.DataFrame):
     df['wcet'] = np.ceil(df['wcet'] * df['wcet_fact']).astype(int)
+
 
 def rand_move(df: pd.DataFrame, mcps):
     sample = df.sample()
@@ -148,17 +149,18 @@ def rand_move(df: pd.DataFrame, mcps):
         core = random.choice(mcp.findall('Core'))
         cid = int(core.get('Id'))
     core_uniq = f"{mid}:{cid}"
-    
+
     C_fact = float(core.get('WCETFactor'))
-    
+
     sln = df.copy()
     sln.loc[sample.index, 'core_uniq'] = core_uniq
     sln.loc[sample.index, 'mcp_id'] = mid
     sln.loc[sample.index, 'core_id'] = cid
     sln.loc[sample.index, 'wcet_fact'] = C_fact
     sln.loc[sample.index, 'wcet'] = C_fact * sln.loc[sample.index, 'task_wcet']
-    
+
     return sln
+
 
 solution = rand_solve(tasks, mcps)
 df = pd.DataFrame(solution)
@@ -172,11 +174,12 @@ for n in attribute_names:
         dt[n] = 'float64'
     else:
         dt[n] = 'int32'
-        
+
 df.columns = attribute_names
 df = df.astype(dt)
 calc_wcrt(df)
-        
+
+
 def calc_beta(cur_cost, cand_cost, T):
     rand = random.random()
     if T < 0.4:
@@ -187,6 +190,7 @@ def calc_beta(cur_cost, cand_cost, T):
         if rand > 0.4:
             return False
         return True
+
 
 def annealing(init: pd.DataFrame, mcps):
     T = 1.0
@@ -202,6 +206,5 @@ def annealing(init: pd.DataFrame, mcps):
         else:
             if beta:
                 df = cand
-        T = T*alpha
+        T = T * alpha
     return df
-        
