@@ -1,5 +1,7 @@
 # Systems Optimisation course
 
+Files contain exercises and playground for various system optimisation methods.
+
 ## Exercise 1 - Simulated annealing
 
 Provided `simanneal.py` script will, by default, run the simulated annealing algorithm on the
