@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 
 random.seed(10)
 
-DATA_SMALL = os.path.join("data", 'small.xml')
-DATA_MEDIUM = os.path.join("data", 'medium.xml')
-DATA_LARGE = os.path.join("data", 'large.xml')
+DATA_SMALL = os.path.join("../data", 'small.xml')
+DATA_MEDIUM = os.path.join("../data", 'medium.xml')
+DATA_LARGE = os.path.join("../data", 'large.xml')
 DATA_IN = DATA_LARGE
 
 # %% Parse
@@ -147,7 +147,7 @@ for core in cores:
         child = ET.SubElement(sol, 'Task', attrib=attribs)
 comment = ET.Comment(f"Average laxity: {lax}")
 s = minidom.parseString(ET.tostring(sol, encoding='unicode')).toprettyxml(indent="    ")
-file_out = os.path.join('solutions', 'sol.xml')
+file_out = os.path.join('../solutions', 'sol.xml')
 with open(file_out, 'w') as f:
     f.write(s)
 
@@ -155,6 +155,6 @@ with open(file_out, 'w') as f:
 df = pd.DataFrame(data=stats['laxities'], columns=["Avg. laxity"])
 df['Schedulable'] = stats['schedulable']
 sns.scatterplot(data=df, x=df.index, y='Avg. laxity', hue='Schedulable')
-f = os.path.join('solutions', 'sol.svg')
+f = os.path.join('../solutions', 'sol.svg')
 plt.savefig(f, bbox_inches='tight')
 plt.show()
