@@ -1,18 +1,26 @@
 import random
-import xml.etree.ElementTree as ET
 from enum import Enum
 import networkx as nx
 from project.model.stream import Stream
+from project.model.nodes import Node, Switch
+from project.model.link import Link
 import matplotlib.pyplot as plt
 
 
 class Topology(Enum):
     FULL_MESH = 1
+    SUKA = 2
+
+
+class Routing(Enum):
+    DISABLED = 1
+    SHORTEST_PATH = 2
+    RANDOM = 3
 
 
 class Tc():
     def __init__(self,
-                 id : str,
+                 id: str,
                  network: nx.DiGraph,
                  streams: list):
         self.id = id
@@ -20,7 +28,7 @@ class Tc():
         self.streams = streams
 
     def as_xml(self) -> str:
-        retval = '<NetworkDescription>'
+        retval = '<NetworkDescription>\n'
         for node in self.network.nodes:
             retval += f'    <device name="{node}" type="Switch"/>\n'
         for edge in self.network.edges:
@@ -38,30 +46,35 @@ class Tc():
         plt.show()
 
 
-
-
 class TcGen:
-    default_cfg = {
-        'stream_range': list(range(10, 50, 10)),
-        'hops_range': list(range(3, 8, 1)),
-        'topology': Topology.FULL_MESH
-    }
 
     def __init__(self,
-                 cfg=default_cfg
+                 streams,
+                 hops,
+                 topology=Topology.FULL_MESH,
+                 routing=Routing.RANDOM
                  ):
-        self.stream_range = *cfg['stream_range'],
-        self.hops_range = *cfg['hops_range'],
-        self.topology = cfg['topology']
+        self.stream_range = list(streams),
+        self.hops_range = *hops,
+        self.topology = topology,
+        self.routing = routing
 
     def generate_testcases(self):
         for n_hops in self.hops_range:
             n_nodes = max(5, n_hops)
 
-            if self.topology == Topology.FULL_MESH:
-                network = (nx.generators.complete_graph(n_nodes)).to_directed()
-            else:
-                raise SystemExit("Only full mesh topologies supported")
+            nodelist = []
+            for n in range(n_nodes):
+                nodelist.append(Switch(n))
+
+            print(self.topology)
+            print(Topology.FULL_MESH)
+            print(self.topology == Topology.FULL_MESH)
+            return
+            # if self.topology == Topology.FULL_MESH:
+            #     network = nx.generators.complete_graph(nodelist, nx.DiGraph())
+            # else:
+            #     raise SystemExit("Only full mesh topologies supported")
 
             for n_streams in self.stream_range:
                 streams = []
@@ -88,5 +101,9 @@ class TcGen:
 
 
 if __name__ == '__main__':
-    tcgen = TcGen()
+    stream_range = list(range(10, 50, 10))
+    hops_range = list(range(3, 8, 1))
+    topology = Topology.FULL_MESH,
+    routing = Routing.RANDOM
+    tcgen = TcGen(stream_range, hops_range)
     tcgen.generate_testcases()
