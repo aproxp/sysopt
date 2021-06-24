@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 
 class Topology(Enum):
     FULL_MESH = 1
-    SUKA = 2
 
 
 class Routing(Enum):
@@ -32,10 +31,11 @@ class Tc():
         for node in self.network.nodes:
             retval += f'    <device name="{node}" type="Switch"/>\n'
         for edge in self.network.edges:
-            retval += f'    <link src="{edge[0]}" dst="{edge[1]}" speed="1"/>\n'
+            l = self.network.edges[edge]['obj']
+            retval += f'    {l.as_xml()}'
 
         for s in self.streams:
-            retval += f'    {s.as_xml()}\n'
+            retval += f'{s.as_xml(with_route=True, indent_level=1)}'
 
         retval += '</NetworkDescription>'
         return retval
@@ -49,32 +49,32 @@ class Tc():
 class TcGen:
 
     def __init__(self,
-                 streams,
-                 hops,
+                 stream_range,
+                 hops_range,
                  topology=Topology.FULL_MESH,
                  routing=Routing.RANDOM
                  ):
-        self.stream_range = list(streams),
-        self.hops_range = *hops,
-        self.topology = topology,
+        self.stream_range = stream_range
+        self.hops_range = hops_range
+        self.topology = topology
         self.routing = routing
 
     def generate_testcases(self):
         for n_hops in self.hops_range:
             n_nodes = max(5, n_hops)
 
-            nodelist = []
-            for n in range(n_nodes):
-                nodelist.append(Switch(n))
+            if self.topology == Topology.FULL_MESH:
+                network = nx.complete_graph(n_nodes, nx.DiGraph())
+            else:
+                raise SystemExit("Only full mesh topologies supported")
 
-            print(self.topology)
-            print(Topology.FULL_MESH)
-            print(self.topology == Topology.FULL_MESH)
-            return
-            # if self.topology == Topology.FULL_MESH:
-            #     network = nx.generators.complete_graph(nodelist, nx.DiGraph())
-            # else:
-            #     raise SystemExit("Only full mesh topologies supported")
+            for n in network.nodes:
+                s = Switch(n)
+                network.nodes[n]['obj'] = s
+
+            for e in network.edges:
+                l = Link(e[0], e[1])
+                network.edges[e]['obj'] = l
 
             for n_streams in self.stream_range:
                 streams = []
@@ -92,7 +92,7 @@ class TcGen:
                     path = random.sample(nodes, n_hops - 2)
                     path = [src] + path + [dst]
 
-                    stream = Stream(s, src, dst, size, period, deadline, path)
+                    stream = Stream(s, src, dst, size, period, deadline, 0, path)
                     streams.append(stream)
                 tc_id = f'{n_streams}s_{n_hops}h'
                 tc = Tc(tc_id, network, streams)
@@ -103,7 +103,7 @@ class TcGen:
 if __name__ == '__main__':
     stream_range = list(range(10, 50, 10))
     hops_range = list(range(3, 8, 1))
-    topology = Topology.FULL_MESH,
+    topology = Topology.FULL_MESH
     routing = Routing.RANDOM
     tcgen = TcGen(stream_range, hops_range)
     tcgen.generate_testcases()

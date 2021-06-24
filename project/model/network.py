@@ -25,7 +25,7 @@ class Network:
                 link = self.G.edges[src, dst]
                 phi = self.model.NewIntVar(0,
                                            stream.period - link.get_serialization_delay(stream.size),
-                                           f'phi_s{stream.id}_l{link.source}-{link.destination}')
+                                           f'phi_s{stream.id}_l{link.src}-{link.dst}')
                 stream._offsets.append(phi)
 
 

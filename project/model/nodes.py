@@ -2,8 +2,6 @@ from dataclasses import dataclass, field
 
 from typing import List
 
-# from project.model.stream import Stream
-
 
 @dataclass
 class Node:
@@ -20,7 +18,7 @@ class Node:
 
 @dataclass
 class Switch(Node):
-    fwd_speed: float = 1.25  # Bytes per second
+    fwd_speed: float = field(default=1.25)  # Bytes per second
 
     def get_fwd_delay(self, size: int) -> int:
         """

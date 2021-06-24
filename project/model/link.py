@@ -5,8 +5,8 @@ from typing import List
 
 @dataclass
 class Link:
-    source: int
-    destination: int
+    src: int
+    dst: int
     speed: float = 1.25 # Bytes per second
 
     propagation_delay: float = 0
@@ -16,13 +16,13 @@ class Link:
     streams_offsets: List[int] = field(default_factory=list)
 
     def as_xml(self):
-        return f'<link src="{self.source}" dst="{self.destination}" speed="{self.speed}"/>\n'
+        return f'<link src="{self.src}" dst="{self.dst}" speed="{self.speed}"/>\n'
 
     def get_serialization_delay(self, size):
         return int(size / self.speed * 10e6)
 
     def get_total_delay(self, size):
-        return (self.propagation_delay + self.ingress_processing_delay + self.egress_processing_delay + self.get_serialization_delay(size))
+        return self.propagation_delay + self.ingress_processing_delay + self.egress_processing_delay + self.get_serialization_delay(size)
 
     @classmethod
     def from_xml_element(cls, e):
