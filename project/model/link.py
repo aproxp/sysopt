@@ -5,8 +5,8 @@ from typing import List
 
 @dataclass
 class Link:
-    src: int
-    dst: int
+    src: str
+    dst: str
     speed: float = 1.25 # Bytes per second
 
     propagation_delay: float = 0
@@ -27,8 +27,8 @@ class Link:
     @classmethod
     def from_xml_element(cls, e):
         return cls(
-            int(e.get('src')),
-            int(e.get('dst')),
+            str(e.get('src')),
+            str(e.get('dst')),
             float(e.get('speed'))
         )
 

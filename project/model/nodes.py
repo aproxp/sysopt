@@ -5,15 +5,12 @@ from typing import List
 
 @dataclass
 class Node:
-    id: int
-    name: str = None
+    name: str
     streams: List['Stream'] = field(default_factory=list)
 
     @classmethod
     def from_xml_element(cls, e):
-        return cls(int(e.get('id')),
-                   name=e.get('name')
-                   )
+        return cls(name=e.get('name'))
 
 
 @dataclass
