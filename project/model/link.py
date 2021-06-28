@@ -16,7 +16,7 @@ class Link:
     streams_offsets: List[int] = field(default_factory=list)
 
     def as_xml(self):
-        return f'<link src="{self.src}" dst="{self.dst}" speed="{self.speed}"/>\n'
+        return f'<link src="{self.src}" dst="{self.dst}" speed="{self.speed}"/>'
 
     def get_serialization_delay(self, size):
         return int(size / self.speed * 10e6)

@@ -44,19 +44,16 @@ class Stream:
     route: list = field(default_factory=list)
     _offsets: List[IntVar] = field(default_factory=list, init=False)
 
-    def as_xml(self, with_route=False, indent_level=0) -> str:
+    def as_xml(self, with_route=False) -> str:
         """
 
         :param with_route: boolean, route will be added to as an xml collection
-        :param indent_level: starting indent level (multiplier for 4 spaces)
         :return:
         :return: XML representation of the stream
         :rtype: str
         """
-        ind = indent_level * '    '
         if not with_route:
-            retval = '{}<stream id="{}" src="{}" dest="{}" size="{}" period="{}" deadline="{}"/>'.format(
-                ind,
+            retval = '<stream id="{}" src="{}" dest="{}" size="{}" period="{}" deadline="{}"/>'.format(
                 self.id,
                 self.src,
                 self.dst,
@@ -65,8 +62,7 @@ class Stream:
                 self.deadline
             )
         else:
-            retval = '{}<stream id="{}" src="{}" dest="{}" size="{}" period="{}" deadline="{}">\n'.format(
-                ind,
+            retval = '<stream id="{}" src="{}" dest="{}" size="{}" period="{}" deadline="{}">'.format(
                 self.id,
                 self.src,
                 self.dst,
@@ -75,23 +71,22 @@ class Stream:
                 self.deadline,
                 self.route_as_xml()
             )
-            retval += self.route_as_xml(indent_level=indent_level + 1)
-            retval += f'{ind}</stream>\n'
+            retval += self.route_as_xml()
+            retval += f'</stream>'
         return retval
 
-    def route_as_xml(self, link_view=True, indent_level=0):
-        ind = indent_level * '    '
-        retval = f'{ind}<route>\n'
+    def route_as_xml(self, link_view=True):
+        retval = f'<route>'
         if not link_view:
             for n in self.route:
-                retval += f'{ind}    <node id="{n}" />\n'
+                retval += f'<node id="{n}" />'
         else:
             for i, l in enumerate(self.route):
                 if i == len(self.route) - 1:
                     break
-                retval += f'{ind}    <link src="{l}" dest="{self.route[i + 1]}" />\n'
+                retval += f'<link src="{l}" dest="{self.route[i + 1]}" />'
 
-        retval += f'{ind}</route>\n'
+        retval += f'</route>'
         return retval
 
     @classmethod

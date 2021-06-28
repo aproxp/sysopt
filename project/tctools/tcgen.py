@@ -1,5 +1,7 @@
 import random
 from enum import Enum
+from xml.dom import minidom
+
 import networkx as nx
 from project.model.stream import Stream
 from project.model.nodes import Node, Switch
@@ -27,15 +29,15 @@ class Tc():
         self.streams = streams
 
     def as_xml(self) -> str:
-        retval = '<NetworkDescription>\n'
+        retval = '<NetworkDescription>'
         for node in self.network.nodes:
-            retval += f'    <device name="{node}" type="Switch"/>\n'
+            retval += f'<device name="{node}" type="Switch"/>'
         for edge in self.network.edges:
             l = self.network.edges[edge]['obj']
-            retval += f'    {l.as_xml()}'
+            retval += f'{l.as_xml()}'
 
         for s in self.streams:
-            retval += f'{s.as_xml(with_route=True, indent_level=1)}'
+            retval += f'{s.as_xml(with_route=True)}'
 
         retval += '</NetworkDescription>'
         return retval
@@ -76,6 +78,10 @@ class TcGen:
                 l = Link(e[0], e[1])
                 network.edges[e]['obj'] = l
 
+            # fig = plt.figure()
+            # nx.draw(network, with_labels=True)
+            # plt.show()
+
             for n_streams in self.stream_range:
                 streams = []
                 for s in range(n_streams):
@@ -97,7 +103,8 @@ class TcGen:
                 tc_id = f'{n_streams}s_{n_hops}h'
                 tc = Tc(tc_id, network, streams)
                 with open(f'tc_{tc_id}.xml', 'w') as f:
-                    f.write(tc.as_xml())
+                    s = minidom.parseString(tc.as_xml()).toprettyxml(indent="    ")
+                    f.write(s)
 
 
 if __name__ == '__main__':
