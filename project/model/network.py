@@ -75,10 +75,11 @@ class Network:
 
         streams = []
         streams_tmp = root.findall("./stream")
-        #TODO: add streams reference for each link
         for s in streams_tmp:
             stream = Stream.from_xml_element(s)
             stream.transform_route(G)
+            for link in stream.route:
+                link.streams.append(stream)
             streams.append(stream)
 
         return cls(G, streams)
