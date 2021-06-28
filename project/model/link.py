@@ -18,6 +18,9 @@ class Link:
     def as_xml(self):
         return f'<link src="{self.src}" dst="{self.dst}" speed="{self.speed}"/>'
 
+    def get_id(self):
+        return f'{self.src}-{self.dst}'
+
     def get_serialization_delay(self, size):
         return int(size / self.speed * 10e6)
 

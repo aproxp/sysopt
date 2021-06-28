@@ -1,4 +1,3 @@
-from typing import List
 from xml.etree.ElementTree import Element
 
 import networkx as nx
@@ -13,6 +12,8 @@ import os
 
 import xml.etree.ElementTree as ET
 
+from math import lcm
+
 
 class Network:
     def __init__(self, G, streams):
@@ -22,10 +23,7 @@ class Network:
 
     def frame_constraint(self):
         for stream in self.streams:
-            for i in range(len(stream.route)-1):
-                src = stream.route[i]
-                dst = stream.route[i+1]
-                link = self.G.edges[src, dst]
+            for link in stream.route:
                 phi = self.model.NewIntVar(0,
                                            stream.period - link.get_serialization_delay(stream.size),
                                            f'phi_s{stream.id}_l{link.src}-{link.dst}')
@@ -33,15 +31,32 @@ class Network:
 
 
     def link_overlap_constraint(self):
-        pass
-        # for node in self.G.nodes:
-        #     for s_i in self.streams:
-        #         if node not in s_i.route:
-        #             continue
-        #         for s_j in self.streams:
-        #             if s_i == s_j or node not in s_j.route:
-        #                 continue
+        for e in self.G.edges:
+            link = self.G.edges[e]['obj']
+            s_i: Stream
+            for s_i in link.streams:
+                s_i_phi = s_i._offsets[s_i.route.index(link)]
+                s_j: Stream
+                for s_j in link.streams:
+                    s_j_phi = s_j._offsets[s_j.route.index(link)]
+                    if s_i == s_j:
+                        continue
+                    hp = lcm(s_i.period, s_j.period)
+                    #TODO: Verify if integer division is the right thing to do
+                    for alpha in range(0, hp//s_i.period):
+                        for beta in range(0, hp//s_j.period):
 
+                            bl = self.model.NewBoolVar(
+                                "bl_l{}_s{}_a{}_s{}_b{}".format(link.get_id(), s_i.id, alpha, s_j.id, beta)
+                            )
+
+                            self.model.Add(
+                                s_i_phi + alpha * s_i.period >= s_j_phi + beta * s_j.period + link.get_serialization_delay(s_j.size)
+                            ).OnlyEnforceIf(bl)
+
+                            self.model.Add(
+                                s_j_phi + beta * s_j.period >= s_i_phi + alpha * s_i.period + link.get_serialization_delay(s_i.size)
+                            ).OnlyEnforceIf(bl.Not())
     def route_constraint(self):
         pass
 
@@ -88,3 +103,4 @@ class Network:
 if __name__ == '__main__':
     net_desc_file = os.path.join(os.path.curdir, '..', 'tctools', 'tc_10s_3h.xml')
     net = Network.from_xml(net_desc_file)
+    net.frame_constraint()
