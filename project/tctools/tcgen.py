@@ -2,11 +2,12 @@ import random
 from enum import Enum
 from xml.dom import minidom
 
-import networkx as nx
-from project.model.stream import Stream
-from project.model.nodes import Node, Switch
-from project.model.link import Link
 import matplotlib.pyplot as plt
+import networkx as nx
+
+from project.model.link import Link
+from project.model.nodes import Switch
+from project.model.stream import Stream
 
 
 class Topology(Enum):
@@ -19,7 +20,7 @@ class Routing(Enum):
     RANDOM = 3
 
 
-class Tc():
+class Tc:
     def __init__(self,
                  id: str,
                  network: nx.DiGraph,
@@ -33,8 +34,8 @@ class Tc():
         for node in self.network.nodes:
             retval += f'<device name="{node}" type="Switch"/>'
         for edge in self.network.edges:
-            l = self.network.edges[edge]['obj']
-            retval += f'{l.as_xml()}'
+            link = self.network.edges[edge]['obj']
+            retval += f'{link.as_xml()}'
 
         for s in self.streams:
             retval += f'{s.as_xml(with_route=True)}'
@@ -75,12 +76,8 @@ class TcGen:
                 network.nodes[n]['obj'] = s
 
             for e in network.edges:
-                l = Link(e[0], e[1])
-                network.edges[e]['obj'] = l
-
-            # fig = plt.figure()
-            # nx.draw(network, with_labels=True)
-            # plt.show()
+                link = Link(e[0], e[1])
+                network.edges[e]['obj'] = link
 
             for n_streams in self.stream_range:
                 streams = []
@@ -98,7 +95,7 @@ class TcGen:
                     path = random.sample(nodes, n_hops - 2)
                     path = [src] + path + [dst]
 
-                    stream = Stream(s, src, dst, size, period, deadline, 0, path)
+                    stream = Stream(str(s), str(src), str(dst), size, period, deadline, 0, path)
                     streams.append(stream)
                 tc_id = f'{n_streams}s_{n_hops}h'
                 tc = Tc(tc_id, network, streams)

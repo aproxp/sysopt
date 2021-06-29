@@ -1,15 +1,9 @@
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-
 from typing import List
 
 import networkx as nx
-
-from project.model.link import Link
-from project.model.nodes import Node
-
-from ortools.sat.python.cp_model import IntVar
-
-import xml.etree.ElementTree as ET
+from ortools.sat.python.cp_model import IntVar, CpSolver
 
 
 @dataclass
@@ -24,8 +18,8 @@ class Stream:
         src (int): source network node
         dst (int): dst network node
         size (int): bytes, size of the stream (in this implementation streams are supposed to fit in one frame)
-        deadline (int): microseconds, how long does the stream have to reach the dst
-        period (int): microseconds, new stream instance (frame) is created each period
+        deadline (float): microseconds, how long does the stream have to reach the dst
+        period (float): microseconds, new stream instance (frame) is created each period
 
         priority (int): queue mapping route (List[Node]): ordered list of nodes traversed from source to dst.
         With a network graph can be transformed into list of edges (link objects)
@@ -44,10 +38,14 @@ class Stream:
     route: list = field(default_factory=list)
     _offsets: List[IntVar] = field(default_factory=list, init=False)
 
+    def get_offsets(self, solution: CpSolver):
+        for link, phi in zip(self.route, self._offsets):
+            print(f'{link.get_id()}: {solution.Value(phi)}')
+
     def as_xml(self, with_route=False) -> str:
         """
 
-        :param with_route: boolean, route will be added to as an xml collection
+        :param with_route: boolean, route will be added as an xml collection
         :return:
         :return: XML representation of the stream
         :rtype: str

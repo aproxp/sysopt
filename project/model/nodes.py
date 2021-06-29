@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from math import ceil
 
 from typing import List
 
@@ -15,7 +16,8 @@ class Node:
 
 @dataclass
 class Switch(Node):
-    fwd_speed: float = field(default=1.25)  # Bytes per second
+    fwd_speed: float = field(default=1250)  # Bytes per nano second
+    # mt: float = 0.01
 
     def get_fwd_delay(self, size: int) -> int:
         """
@@ -24,7 +26,7 @@ class Switch(Node):
         :param size: frame size in bytes
         :return: forwarding delay in microseconds
         """
-        return int(size / self.fwd_speed * 10e6)
+        return int(ceil(size / (self.fwd_speed * 1e6 * self.mt)))
 
     def get_worst_case_fwd_delay(self, stream: 'Stream') -> int:
         """
@@ -33,6 +35,7 @@ class Switch(Node):
         :param stream: stream to get worst case forwarding delay for
         :return:
         """
+        #TODO: rewrite so it actually works
         delay: int = self.get_fwd_delay(stream.size)
         for s in self.streams:
             if stream.priority < s.priority:
