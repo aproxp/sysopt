@@ -24,7 +24,8 @@ class Stream:
         priority (int): queue mapping route (List[Node]): ordered list of nodes traversed from source to dst.
         With a network graph can be transformed into list of edges (link objects)
 
-         _offsets (List[IntVar]): list of offsets phi on each link along the route. Actual value is obtained by running
+         _offsets (List[IntVar]): list of offsets phi on each link along the route. Unit is in macro-ticks
+         Actual value is obtained by running
          the solver and calling solver.Value(_offsets[i])
     """
     id: str

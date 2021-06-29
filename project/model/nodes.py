@@ -17,7 +17,7 @@ class Node:
 @dataclass
 class Switch(Node):
     fwd_speed: float = field(default=1250)  # Bytes per nano second
-    # mt: float = 0.01
+    mt: float = 0.01
 
     def get_fwd_delay(self, size: int) -> int:
         """

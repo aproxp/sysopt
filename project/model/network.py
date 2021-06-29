@@ -24,19 +24,31 @@ class Network:
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
         self.delta = 1
-        self.res = 100 # is used as a multiplier to get the resolution down
 
     def frame_constraint(self):
+        """Creates the IntVars for the CP-solver.
+
+        """
+        mt = None
         for stream in self.streams:
             for link in stream.route:
+                if not mt:
+                    mt = link.mt
+                elif mt != link.mt:
+                    raise SystemExit('Only one value of macro-tick supported')
+
+                mul = int(link.mt**-1)
+
                 phi = self.model.NewIntVar(0,
-                                           int(stream.period * self.res) - link.get_serialization_delay(stream.size),
+                                           # Serialization delay is already in macro-ticks
+                                           stream.period * mul - link.get_serialization_delay(stream.size),
                                            f'phi_s{stream.id}_l{link.src}-{link.dst}')
                 stream._offsets.append(phi)
 
     def link_overlap_constraint(self):
         for e in self.G.edges:
             link = self.G.edges[e]['obj']
+            mul = int(link.mt ** -1)
             s_i: Stream
             for s_i in link.streams:
                 s_i_phi = s_i._offsets[s_i.route.index(link)]
@@ -54,25 +66,16 @@ class Network:
                                 "bl_l{}_s{}_a{}_s{}_b{}".format(link.get_id(), s_i.id, alpha, s_j.id, beta)
                             )
 
+
                             self.model.Add(
-                                s_i_phi + alpha * int(s_i.period * self.res) >=
-                                s_j_phi + beta * int(s_j.period * self.res) + link.get_serialization_delay(s_j.size)
+                                s_i_phi + alpha * s_i.period * mul >=
+                                s_j_phi + beta * s_j.period * mul + link.get_serialization_delay(s_j.size)
                             ).OnlyEnforceIf(bl)
 
                             self.model.Add(
-                                s_j_phi + beta * int(s_j.period * self.res) >=
-                                s_i_phi + alpha * int(s_i.period * self.res) + link.get_serialization_delay(s_i.size)
+                                s_j_phi + beta * s_j.period * mul >=
+                                s_i_phi + alpha * s_i.period * mul + link.get_serialization_delay(s_i.size)
                             ).OnlyEnforceIf(bl.Not())
-
-                            # self.model.Add(
-                            #     s_i_phi + alpha * int(s_i.period / link.mt) >=
-                            #     s_j_phi + beta * int(s_j.period / link.mt) + link.get_serialization_delay(s_j.size)
-                            # ).OnlyEnforceIf(bl)
-                            #
-                            # self.model.Add(
-                            #     s_j_phi + beta * int(s_j.period / link.mt) >=
-                            #     s_i_phi + alpha * int(s_i.period / link.mt) + link.get_serialization_delay(s_i.size)
-                            # ).OnlyEnforceIf(bl.Not())
 
     def route_constraint(self):
         for stream in self.streams:
@@ -82,14 +85,13 @@ class Network:
                 l1_phi = stream._offsets[stream.route.index(l1)]
                 l2_phi = stream._offsets[stream.route.index(l2)]
 
+                mul = int(l1.mt ** -1)
+
+                # multiply both sides of the inequality by mul to get rid of the macrotick
                 self.model.Add(
-                    l2_phi  - l2.propagation_delay * self.res - self.delta * self.res >=
-                    (l1_phi + l1.get_serialization_delay(stream.size) * self.res)
+                    l2_phi  - mul * (l2.propagation_delay + self.delta) >=
+                    (l1_phi + l1.get_serialization_delay(stream.size))
                 )
-                # self.model.Add(
-                #     l2_phi * l2.mt - l2.propagation_delay - self.delta >=
-                #     (l1_phi + l1.get_serialization_delay(stream.size)) * l1.mt
-                # )
 
     def alex_route_constraint(self):
         for stream in self.streams:
@@ -106,9 +108,12 @@ class Network:
                 link_delay = l1.get_total_delay(stream.size)
                 delay = fwd_delay + link_delay
 
+                mul = int(l1.mt ** -1)
+
+                # multiply both sides of the inequality by mul to get rid of the macrotick
                 self.model.Add(
-                    l2_phi * l2.mt - l2.propagation_delay - self.delta >=
-                    (l1_phi + delay) * l1.mt
+                    l2_phi  - mul * (l2.propagation_delay + self.delta) >=
+                    (l1_phi + delay)
                 )
 
     def end_to_end_constraint(self):
@@ -118,8 +123,10 @@ class Network:
             last: Link = stream.route[-1]
             last_phi = stream._offsets[-1]
 
+            mul = int(first.mt**-1)
             self.model.Add(
-                first.mt * first_phi + stream.deadline >= last.mt * last_phi + last.get_total_delay(stream.size)
+                first_phi + mul * stream.deadline >= last_phi + last.get_total_delay(stream.size)
+                # first.mt * first_phi + stream.deadline >= last.mt * last_phi + last.get_total_delay(stream.size)
             )
 
     def frame_isolation_constraint(self):
@@ -144,6 +151,8 @@ class Network:
                     cur_link_s_i_phi = s_i._offsets[hop_s_i]
                     cur_link_s_j_phi = s_j._offsets[hop_s_j]
 
+                    mul = int(link.mt**-1)
+
                     hp = lcm(s_i.period, s_j.period)
                     # TODO: Verify if integer division is the right thing to do
                     for alpha in range(0, hp // s_i.period):
@@ -152,13 +161,17 @@ class Network:
                                 "bl_isol_l{}_s{}_a{}_s{}_b{}".format(link.get_id(), s_i.id, alpha, s_j.id, beta)
                             )
                             self.model.Add(
-                                cur_link_s_j_phi * link.mt + alpha * s_j.period + self.delta <=
-                                prev_link_s_i_phi * prev_link_s_i.mt + beta + s_i.period + prev_link_s_i.propagation_delay
+                                cur_link_s_j_phi + mul * (alpha * s_j.period + self.delta) <=
+                                prev_link_s_i_phi  + mul * (beta + s_i.period) + prev_link_s_i.get_prop_delay()
+                                # cur_link_s_j_phi * link.mt + alpha * s_j.period + self.delta <=
+                                # prev_link_s_i_phi * prev_link_s_i.mt + beta + s_i.period + prev_link_s_i.propagation_delay
                             ).OnlyEnforceIf(bl)
 
                             self.model.Add(
-                                cur_link_s_i_phi * link.mt + beta * s_i.period + self.delta <=
-                                prev_link_s_j_phi * prev_link_s_j.mt + alpha + s_j.period + prev_link_s_j.propagation_delay
+                                cur_link_s_i_phi + mul * (beta * s_i.period + self.delta) <=
+                                prev_link_s_j_phi + mul * (alpha + s_j.period) + prev_link_s_j.get_prop_delay()
+                                # cur_link_s_i_phi * link.mt + beta * s_i.period + self.delta <=
+                                # prev_link_s_j_phi * prev_link_s_j.mt + alpha + s_j.period + prev_link_s_j.propagation_delay
                             ).OnlyEnforceIf(bl.Not())
 
     def alex_frame_isolation_constraint(self):
@@ -183,6 +196,7 @@ class Network:
                     cur_link_s_i_phi = s_i._offsets[hop_s_i]
                     cur_link_s_j_phi = s_j._offsets[hop_s_j]
 
+                    mul = int(link.mt**-1)
                     hp = lcm(s_i.period, s_j.period)
                     # TODO: Verify if integer division is the right thing to do
                     for alpha in range(0, hp // s_i.period):
@@ -191,15 +205,21 @@ class Network:
                                 "bl_isol_l{}_s{}_a{}_s{}_b{}".format(link.get_id(), s_i.id, alpha, s_j.id, beta)
                             )
                             self.model.Add(
-                                cur_link_s_j_phi * link.mt + alpha * s_j.period + self.delta <=
-                                prev_link_s_i_phi * prev_link_s_i.mt + beta + s_i.period + prev_link_s_i.get_total_delay(
+                                cur_link_s_j_phi + mul * (alpha * s_j.period + self.delta) <=
+                                prev_link_s_i_phi + mul * (beta + s_i.period) + prev_link_s_i.get_total_delay(
                                     s_i.size)
+                                # cur_link_s_j_phi * link.mt + alpha * s_j.period + self.delta <=
+                                # prev_link_s_i_phi * prev_link_s_i.mt + beta + s_i.period + prev_link_s_i.get_total_delay(
+                                #     s_i.size)
                             ).OnlyEnforceIf(bl)
 
                             self.model.Add(
-                                cur_link_s_i_phi * link.mt + beta * s_i.period + self.delta <=
-                                prev_link_s_j_phi * prev_link_s_j.mt + alpha + s_j.period + prev_link_s_j.get_total_delay(
+                                cur_link_s_i_phi + mul * (beta * s_i.period + self.delta) <=
+                                prev_link_s_j_phi + mul * (alpha + s_j.period) + prev_link_s_j.get_total_delay(
                                     s_j.size)
+                                # cur_link_s_i_phi * link.mt + beta * s_i.period + self.delta <=
+                                # prev_link_s_j_phi * prev_link_s_j.mt + alpha + s_j.period + prev_link_s_j.get_total_delay(
+                                #     s_j.size)
                             ).OnlyEnforceIf(bl.Not())
 
     def solve(self):
